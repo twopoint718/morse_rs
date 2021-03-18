@@ -3,6 +3,21 @@ use std::path::Path;
 use wav;
 use std::f64::consts::{PI};
 use std::convert::TryInto;
+use std::path::PathBuf;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "morse_rs", about = "Your Morse code command line buddy.")]
+struct Opt {
+    #[structopt(short = "w", long = "wpm", default_value = "20")]
+    wpm: u32,
+
+    #[structopt(short = "o", long = "output", default_value = "output.wav")]
+    output_file: String,
+
+    #[structopt(short = "f", long = "frequency", default_value = "600")]
+    frequency: f64,
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum Sound {
@@ -26,13 +41,14 @@ const TABLE: [(char, &str); 40]= [
 ];
 
 fn main() -> Result<(), std::io::Error> {
-    let mut out_file = File::create(Path::new("output.wav"))?;
-    let frequency = 600.0;
+    let opt = Opt::from_args();
+
+    let mut out_file = File::create(Path::new(&opt.output_file))?;
+    let frequency = opt.frequency;
     let sample_rate = 44_100;
     let bit_depth = 8;
-    let wpm = 20;
+    let wpm = opt.wpm;
 
-    // Speed calculation, just change WPM and this will recompute.
     let elt_per_word = 50; // "PARIS" - standard word for WPM calculation
     let secs_per_min = 60;
     let samples_per_element: u32 = (
@@ -106,6 +122,8 @@ fn lookup(c: char) -> &'static str {
 }
 
 mod tests {
+    #[allow(unused_imports)]
+    use super::*;
 
     #[test]
     fn test_schedule_character() {
