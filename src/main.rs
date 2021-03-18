@@ -72,6 +72,13 @@ fn main() -> Result<(), std::io::Error> {
             },
             Sound::On => {
                 for i in 0..*duration {
+		    if i > (*duration - 220) {
+			// damp out the sound near the end, 220 ~ 5ms
+			let scale_factor : f64 = 1.0 - (i as f64 - 220.0)/(*duration as f64 - 220.0);
+			let sample = WAV[i as usize % WAV.len()];
+			let attenuated = scale_factor * (sample as f64 - 128.0) + 128.0;
+			raw_data.push(attenuated as u8);
+		    }
                     raw_data.push(WAV[i as usize % WAV.len()]);
                 }
             }
