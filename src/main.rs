@@ -1,9 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 use wav;
-use std::f64::consts::{PI};
 use std::convert::TryInto;
-use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -14,9 +12,6 @@ struct Opt {
 
     #[structopt(short = "o", long = "output", default_value = "output.wav")]
     output_file: String,
-
-    #[structopt(short = "f", long = "frequency", default_value = "600")]
-    frequency: f64,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -25,7 +20,14 @@ enum Sound {
     Off,
 }
 
-// TODO: constant wave table
+// This is one period of a 600 Hz wave sampled at 44,100
+const WAV: [u8; 75] = [
+    128, 138, 149, 160, 170, 181, 190, 200, 208, 217, 224, 231, 237, 242, 247,
+    250, 253, 255, 255, 255, 254, 252, 249, 246, 241, 236, 229, 222, 215, 206,
+    197, 188, 178, 168, 157, 147, 136, 125, 114, 103,  92,  82,  72,  62,  53,
+     45,  37,  29,  23,  17,  12,   7,   4,   2,   0,   0,   0,   1,   3,   6,
+     10,  15,  21,  27,  35,  42,  51,  60,  70,  79,  90, 100, 111, 122, 128,
+];
 
 const TABLE: [(char, &str); 40]= [
     ('A', ".-"    ), ('B', "-..."  ), ('C', "-.-."  ), ('D', "-.."  ),
@@ -44,7 +46,6 @@ fn main() -> Result<(), std::io::Error> {
     let opt = Opt::from_args();
 
     let mut out_file = File::create(Path::new(&opt.output_file))?;
-    let frequency = opt.frequency;
     let sample_rate = 44_100;
     let bit_depth = 8;
     let wpm = opt.wpm;
@@ -61,20 +62,17 @@ fn main() -> Result<(), std::io::Error> {
         assert_eq!(2646, samples_per_element);
     }
 
-    let amplitude = 255.0;
     let header = wav::Header::new(1, 1, sample_rate, bit_depth);
     let mut raw_data: Vec<u8> = Vec::new();
 
-    let mut sample: f64;
     for (event, duration) in schedule_word(samples_per_element, "KD9KJV").iter() {
         match event {
             Sound::Off => {
                 raw_data.append(&mut vec![0; (*duration as u32).try_into().unwrap()]);
             },
             Sound::On => {
-                for x in 0..*duration {
-                    sample = (((frequency * (f64::from(x) / f64::from(sample_rate)) * 2.0 * PI).sin() + 1.0) / 2.0 * amplitude).floor();
-                    raw_data.push(sample as u8);
+                for i in 0..*duration {
+                    raw_data.push(WAV[i as usize % WAV.len()]);
                 }
             }
         }
