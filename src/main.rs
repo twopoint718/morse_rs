@@ -72,14 +72,22 @@ fn main() -> Result<(), std::io::Error> {
             },
             Sound::On => {
                 for i in 0..*duration {
-		    if i > (*duration - 220) {
-			// damp out the sound near the end, 220 ~ 5ms
-			let scale_factor : f64 = 1.0 - (i as f64 - 220.0)/(*duration as f64 - 220.0);
-			let sample = WAV[i as usize % WAV.len()];
-			let attenuated = scale_factor * (sample as f64 - 128.0) + 128.0;
-			raw_data.push(attenuated as u8);
-		    }
-                    raw_data.push(WAV[i as usize % WAV.len()]);
+                    if i < 256 {
+                        // fade in audio at start of element (255 ~ 5ms) by
+                        // increasing envelope of waveform
+                        let n: u8 = (i as u8).try_into().expect("Value too large for u8");
+                        let sample = WAV[i as usize % WAV.len()];
+                        let attenuated = clamp(127, n/2, sample);
+                        raw_data.push(attenuated as u8);
+                    } else if i > (*duration - 256) {
+                        // fade out audio at end of element
+                        let n: u8 = ((*duration - i) as u8).try_into().expect("Value too large for u8");
+                        let sample = WAV[i as usize % WAV.len()];
+                        let attenuated = clamp(127, n/2, sample);
+                        raw_data.push(attenuated as u8);
+                    } else {
+                        raw_data.push(WAV[i as usize % WAV.len()]);
+                    }
                 }
             }
         }
@@ -124,6 +132,12 @@ fn lookup(c: char) -> &'static str {
         }
     }
     panic!("Looked up an unknown character, '{}'", c);
+}
+
+fn clamp(center: u8, range: u8, n: u8) -> u8 {
+    if n < (center - range) { return center - range; }
+    if n > (center + range) { return center + range; }
+    n
 }
 
 mod tests {
@@ -174,5 +188,13 @@ mod tests {
     fn test_lookup() {
         let actual = lookup('A');
         assert_eq!(actual, ".-");
+    }
+
+    #[test]
+    fn test_clamp() {
+        assert_eq!(100, clamp(127, 27, 0));   // under
+        assert_eq!(154, clamp(127, 27, 155)); // over
+        assert_eq!(120, clamp(127, 27, 120)); // within
+        assert_eq!(127, clamp(127, 0, 225));  // no range
     }
 }
